@@ -1,19 +1,24 @@
 import './App.css'
-let injectedProvider = false
-
-if (typeof window.ethereum !== 'undefined') {
-  injectedProvider = true
-  console.log(window.ethereum)
-}
-
-const isMetaMask = injectedProvider ? window.ethereum.isMetaMask : false
+import { useState, useEffect } from 'react'
+import detectEthereumProvider from '@metamask/detect-provider'
 
 const App = () => {
+  const [hasProvider, setHasProvider] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const getProvider = async () => {
+      const provider = await detectEthereumProvider({ silent: true })
+      console.log(provider)
+      setHasProvider(Boolean(provider)) // transform provider to true or false
+    }
+
+    getProvider()
+  }, [])
 
   return (
     <div className="App">
-      <h2>Injected Provider { injectedProvider ? 'DOES' : 'DOES NOT'} Exist</h2>
-      { isMetaMask &&
+      <div>Injected Provider {hasProvider ? 'DOES' : 'DOES NOT'} Exist</div>
+      { hasProvider &&
         <button>Connect MetaMask</button>
       }
     </div>
