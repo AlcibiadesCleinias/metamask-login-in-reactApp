@@ -1,12 +1,16 @@
 import './App.css'
 import { useState, useEffect } from 'react'
-import { formatBalance, formatChainAsNum } from './utils'  /* New */
+import { formatBalance, formatChainAsNum } from './utils'
 import detectEthereumProvider from '@metamask/detect-provider'
 
 const App = () => {
   const [hasProvider, setHasProvider] = useState<boolean | null>(null)
-  const initialState = { accounts: [], balance: "", chainId: "" }  /* Updated */
+  const initialState = { accounts: [], balance: "", chainId: "" }
   const [wallet, setWallet] = useState(initialState)
+
+  const [isConnecting, setIsConnecting] = useState(false)  /* New */
+  const [error, setError] = useState(false)                /* New */
+  const [errorMessage, setErrorMessage] = useState("")     /* New */
 
   useEffect(() => {
     const refreshAccounts = (accounts: any) => {
@@ -18,9 +22,9 @@ const App = () => {
       }
     }
 
-    const refreshChain = (chainId: any) => {               /* New */
-      setWallet((wallet) => ({ ...wallet, chainId }))      /* New */
-    }                                                      /* New */
+    const refreshChain = (chainId: any) => {
+      setWallet((wallet) => ({ ...wallet, chainId }))
+    }
 
     const getProvider = async () => {
       const provider = await detectEthereumProvider({ silent: true })
@@ -32,7 +36,7 @@ const App = () => {
         )
         refreshAccounts(accounts)
         window.ethereum.on('accountsChanged', refreshAccounts)
-        window.ethereum.on("chainChanged", refreshChain)  /* New */
+        window.ethereum.on("chainChanged", refreshChain)
       }
     }
 
@@ -40,43 +44,61 @@ const App = () => {
 
     return () => {
       window.ethereum?.removeListener('accountsChanged', refreshAccounts)
-      window.ethereum?.removeListener("chainChanged", refreshChain)  /* New */
+      window.ethereum?.removeListener("chainChanged", refreshChain)
     }
   }, [])
 
-  const updateWallet = async (accounts:any) => {
-    const balance = formatBalance(await window.ethereum!.request({   /* New */
-      method: "eth_getBalance",                                      /* New */
-      params: [accounts[0], "latest"],                               /* New */
-    }))                                                              /* New */
-    const chainId = await window.ethereum!.request({                 /* New */
-      method: "eth_chainId",                                         /* New */
-    })                                                               /* New */
-    setWallet({ accounts, balance, chainId })                        /* Updated */
+  const updateWallet = async (accounts: any) => {
+    const balance = formatBalance(await window.ethereum!.request({
+      method: "eth_getBalance",
+      params: [accounts[0], "latest"],
+    }))
+    const chainId = await window.ethereum!.request({
+      method: "eth_chainId",
+    })
+    setWallet({ accounts, balance, chainId })
   }
 
-  const handleConnect = async () => {
-    let accounts = await window.ethereum.request({
+  const handleConnect = async () => {                   /* Updated */
+    setIsConnecting(true)                               /* New */
+    await window.ethereum.request({                     /* Updated */
       method: "eth_requestAccounts",
     })
-    updateWallet(accounts)
+    .then((accounts:[]) => {                            /* New */
+      setError(false)                                   /* New */
+      updateWallet(accounts)                            /* New */
+    })                                                  /* New */
+    .catch((err:any) => {                               /* New */
+      setError(true)                                    /* New */
+      setErrorMessage(err.message)                      /* New */
+    })                                                  /* New */
+    setIsConnecting(false)                              /* New */
   }
+
+  const disableConnect = Boolean(wallet) && isConnecting
 
   return (
     <div className="App">
       <div>Injected Provider {hasProvider ? 'DOES' : 'DOES NOT'} Exist</div>
 
-      { window.ethereum?.isMetaMask && wallet.accounts.length < 1 &&
-        <button onClick={handleConnect}>Connect MetaMask</button>
+      {window.ethereum?.isMetaMask && wallet.accounts.length < 1 &&
+                /* Updated */
+        <button disabled={disableConnect} onClick={handleConnect}>Connect MetaMask</button>
       }
 
-      { wallet.accounts.length > 0 &&
-        <>                                                               {/* New */}
+      {wallet.accounts.length > 0 &&
+        <>
           <div>Wallet Accounts: {wallet.accounts[0]}</div>
-          <div>Wallet Balance: {wallet.balance}</div>                    {/* New */}
-          <div>Hex ChainId: {wallet.chainId}</div>                       {/* New */}
-          <div>Numeric ChainId: {formatChainAsNum(wallet.chainId)}</div> {/* New */}
+          <div>Wallet Balance: {wallet.balance}</div>
+          <div>Hex ChainId: {wallet.chainId}</div>
+          <div>Numeric ChainId: {formatChainAsNum(wallet.chainId)}</div>
         </>
+      }
+      { error && (                                        /* New code block */
+          <div onClick={() => setError(false)}>
+            <strong>Error:</strong> {errorMessage}
+          </div>
+        )
       }
     </div>
   )
